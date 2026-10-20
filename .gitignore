@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+
+# Handshake AI's own case-study material — not mine to republish.
+# The dashboard still runs without these; the data is baked into dashboard.html.
+PSO_Case_Study.pdf
+pso_funnel_events*.csv
+
+# Original notebook generator. The notebook has since been edited directly (appendix of
+# supporting checks), so re-running this would overwrite it.
+notebooks/build_notebook.py

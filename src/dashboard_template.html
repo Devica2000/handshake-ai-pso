@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSO Funnel</title>
+<style>
+:root {
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --critical:#d03b3b; --good:#0ca30c;
+  --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#6da7ec; --seq4:#3987e5; --seq5:#256abf; --seq6:#184f95; --seq7:#0d366b;
+  --hover:rgba(11,11,11,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19;
+    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --critical:#d03b3b; --good:#0ca30c;
+    /* the ramp runs the other way on a dark surface: low values recede into it */
+    --seq1:#0d366b; --seq2:#184f95; --seq3:#256abf; --seq4:#2a78d6; --seq5:#5598e7; --seq6:#86b6ef; --seq7:#b7d3f6;
+    --hover:rgba(255,255,255,0.06);
+  }
+  :root:not([data-theme="light"]) svg .cell-hi { fill:#0b0b0b; }
+  :root:not([data-theme="light"]) svg .cell-lo { fill:#ffffff; }
+  :root:not([data-theme="light"]) svg .cell-hi-sub { fill:rgba(11,11,11,0.62); }
+  :root:not([data-theme="light"]) svg .cell-lo-sub { fill:rgba(255,255,255,0.82); }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19;
+  --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --critical:#d03b3b; --good:#0ca30c;
+  --seq1:#0d366b; --seq2:#184f95; --seq3:#256abf; --seq4:#2a78d6; --seq5:#5598e7; --seq6:#86b6ef; --seq7:#b7d3f6;
+  --hover:rgba(255,255,255,0.06);
+}
+:root[data-theme="dark"] svg .cell-hi { fill:#0b0b0b; }
+:root[data-theme="dark"] svg .cell-lo { fill:#ffffff; }
+:root[data-theme="dark"] svg .cell-hi-sub { fill:rgba(11,11,11,0.62); }
+:root[data-theme="dark"] svg .cell-lo-sub { fill:rgba(255,255,255,0.82); }
+
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--page); color:var(--ink);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.wrap { max-width:1180px; margin:0 auto; padding:24px 16px 72px; }
+
+header { display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:4px; }
+h1 { font-size:21px; margin:0 0 2px; letter-spacing:-0.01em; }
+.sub { color:var(--ink2); font-size:13px; margin:0; }
+.spacer { flex:1 1 auto; }
+button, select {
+  font:inherit; color:var(--ink); background:var(--surface);
+  border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer;
+}
+button:hover, select:hover { background:var(--hover); }
+
+.headline {
+  background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--critical);
+  border-radius:10px; padding:14px 16px; margin:18px 0 0; font-size:14px; line-height:1.6;
+}
+.headline b { font-weight:650; }
+
+.panel {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:12px; padding:16px; margin-top:16px;
+}
+.panel h2 { font-size:15px; margin:0 0 3px; }
+.panel h3 { font-size:13px; margin:22px 0 3px; color:var(--ink); }
+.panel p.note { color:var(--ink2); font-size:12.5px; margin:0 0 14px; max-width:78ch; }
+
+/* filters */
+.filters { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
+.field { display:flex; flex-direction:column; gap:3px; }
+.field label { font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.field select { min-width:118px; }
+.check { display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink2); cursor:pointer; padding-bottom:7px; }
+.check input { accent-color:var(--s1); width:15px; height:15px; cursor:pointer; }
+
+/* KPI tiles */
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:12px; margin-top:16px; }
+.kpi { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 15px; }
+.kpi .k { font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.kpi .v { font-size:26px; font-weight:600; letter-spacing:-0.02em; margin-top:3px; }
+.kpi .d { font-size:12px; color:var(--ink2); margin-top:1px; }
+
+/* tabs */
+.tabs { display:flex; gap:4px; flex-wrap:wrap; margin-top:22px; border-bottom:1px solid var(--border); }
+.tab {
+  border:none; background:none; border-radius:8px 8px 0 0; padding:9px 13px;
+  color:var(--ink2); font-size:13.5px; border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tab[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--s1); font-weight:550; }
+.tabpanel[hidden] { display:none; }
+
+/* charts + tables */
+svg { display:block; width:100%; overflow:visible; }
+svg text { fill:var(--ink2); font-size:11px; }
+svg .tick { fill:var(--muted); font-size:10.5px; }
+svg .vlabel { fill:var(--ink); font-size:11px; font-weight:550; }
+svg .worstlabel { fill:var(--critical); font-weight:600; }
+/* Heatmap cell labels. In light mode high values are dark fills, so they take
+   light ink; in dark mode the ramp is inverted and so is the ink. */
+svg .cell-hi { fill:#ffffff; }
+svg .cell-lo { fill:#0b0b0b; }
+svg .cell-hi-sub { fill:rgba(255,255,255,0.82); }
+svg .cell-lo-sub { fill:rgba(11,11,11,0.62); }
+svg .gridline { stroke:var(--grid); stroke-width:1; }
+svg .axisline { stroke:var(--axis); stroke-width:1; }
+
+table { border-collapse:collapse; width:100%; font-size:12.5px; font-variant-numeric:tabular-nums; }
+th, td { text-align:right; padding:5px 9px; border-bottom:1px solid var(--grid); white-space:nowrap; }
+th:first-child, td:first-child { text-align:left; font-variant-numeric:normal; }
+th { color:var(--muted); font-weight:550; font-size:11px; text-transform:uppercase; letter-spacing:0.03em; }
+tr.worst td { background:color-mix(in srgb, var(--critical) 9%, transparent); }
+td.dim { color:var(--muted); }
+.tablewrap { overflow-x:auto; margin-top:8px; }
+
+.legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--ink2); margin:0 0 6px; }
+.legend span { display:inline-flex; align-items:center; gap:6px; }
+.swatch { width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+.callout {
+  border:1px solid var(--border); border-left:3px solid var(--s1);
+  border-radius:8px; padding:11px 13px; margin-top:14px; font-size:13px; line-height:1.6; color:var(--ink);
+}
+.callout.warn { border-left-color:var(--critical); }
+.callout.good { border-left-color:var(--good); }
+.callout b { font-weight:650; }
+
+.empty { color:var(--muted); font-size:13px; padding:28px 0; text-align:center; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+@media (max-width:820px) { .grid2 { grid-template-columns:1fr; } }
+
+#tooltip {
+  position:fixed; pointer-events:none; z-index:50; opacity:0; transition:opacity .08s;
+  background:var(--surface); color:var(--ink); border:1px solid var(--border);
+  border-radius:8px; padding:7px 10px; font-size:12px; line-height:1.5;
+  box-shadow:0 4px 14px rgba(0,0,0,0.13); max-width:260px;
+}
+#tooltip b { font-weight:620; }
+footer { color:var(--muted); font-size:12px; margin-top:28px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>PSO Onboarding Funnel</h1>
+    <p class="sub">53,935 PSO instances &middot; 12 projects &middot; invited 1 Jun – 31 Aug 2026, extracted 1 Sep 2026</p>
+  </div>
+  <div class="spacer"></div>
+  <button id="themeBtn" type="button">Dark mode</button>
+</header>
+
+<div class="headline" id="headline"></div>
+
+<div class="panel">
+  <div class="filters" id="filters"></div>
+  <div class="callout warn" id="deviceWarning" hidden></div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="tabs" role="tablist" id="tabs"></div>
+
+<div class="tabpanel" id="tab-funnel">
+  <div class="panel">
+    <h2>The funnel</h2>
+    <p class="note">One bar per step, measured as PSO instances that <em>ever</em> reached that step. Grey marks
+      what was lost since the previous step. Hover any bar for detail.</p>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--s1)"></i>reached this step</span>
+      <span><i class="swatch" style="background:var(--grid)"></i>lost at this step</span>
+      <span><i class="swatch" style="background:var(--critical)"></i>worst conversion</span>
+    </div>
+    <div id="funnelChart"></div>
+    <h3>Table view</h3>
+    <div class="tablewrap"><table id="funnelTable"></table></div>
+    <div class="callout" id="funnelNote"></div>
+  </div>
+</div>
+
+<div class="tabpanel" id="tab-assessment" hidden>
+  <div class="panel">
+    <h2>Why people abandon the assessment</h2>
+    <p class="note">The <code>assessment_started</code> event carries <code>session_seconds</code> and
+      <code>questions_answered</code>, which tells us what abandoners actually did before leaving.</p>
+    <div class="kpis" id="assessKpis"></div>
+    <div class="callout warn" id="bounceNote"></div>
+
+    <div class="grid2" style="margin-top:26px">
+      <div>
+        <h3>Abandoners bail after ~90 seconds, whatever the assessment length</h3>
+        <p class="note">If length caused fatigue, this line would rise. It is flat.</p>
+        <div id="bailChart"></div>
+      </div>
+      <div>
+        <h3>Attempt rate steps down at 40 minutes</h3>
+        <p class="note">A cliff between 30 and 40 minutes, not a gradient. Bars show 95% Wilson intervals.</p>
+        <div id="lengthChart"></div>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:26px">
+      <div>
+        <h3>Device is the largest single effect</h3>
+        <p class="note">Share of starters who go on to answer at least one question. 95% Wilson intervals.</p>
+        <div id="deviceChart"></div>
+      </div>
+      <div>
+        <h3>The two drivers compound</h3>
+        <p class="note">Attempt rate by device and assessment length. Cell labels are the rate; n below.</p>
+        <div id="matrixChart"></div>
+      </div>
+    </div>
+    <div class="callout" id="assessNote"></div>
+  </div>
+</div>
+
+<div class="tabpanel" id="tab-compare" hidden>
+  <div class="panel">
+    <h2>Compare any segment</h2>
+    <p class="note">Pick a step transition and a dimension to split it by. Rates are computed on the instances
+      that reached the <em>from</em> step, with 95% Wilson intervals, inside whatever filters are set above.</p>
+    <div class="filters" style="margin-bottom:18px">
+      <div class="field"><label for="cmpFrom">From step</label><select id="cmpFrom"></select></div>
+      <div class="field"><label for="cmpTo">To step</label><select id="cmpTo"></select></div>
+      <div class="field"><label for="cmpDim">Split by</label><select id="cmpDim"></select></div>
+    </div>
+    <div id="compareChart"></div>
+    <div class="tablewrap"><table id="compareTable"></table></div>
+  </div>
+</div>
+
+<div class="tabpanel" id="tab-likeness" hidden>
+  <div class="panel">
+    <h2>Likeness agreement: where should the consent step go?</h2>
+    <p class="note">Randomised pilot on three projects. <b>Early</b> asks right after the invitation is accepted
+      (<code>after_accept</code>); <b>late</b> asks at the contract (<code>with_contract</code>). This tab ignores
+      the project and likeness filters above so the two arms stay comparable.</p>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--s1)"></i>early — after accept</span>
+      <span><i class="swatch" style="background:var(--s2)"></i>late — with contract</span>
+    </div>
+    <div id="abChart"></div>
+    <div class="tablewrap"><table id="abTable"></table></div>
+    <div class="callout good" id="abVerdict"></div>
+    <div class="callout warn" id="abCaveat"></div>
+  </div>
+</div>
+
+<div class="tabpanel" id="tab-quality" hidden>
+  <div class="panel">
+    <h2>Data quality &amp; what this data cannot tell us</h2>
+    <p class="note">Everything below was found in the raw export and is handled in <code>src/pso_clean.py</code>.</p>
+    <div id="qualityBody"></div>
+    <h3>Right-censoring: completion by allocation week</h3>
+    <p class="note">The export is dated 1 Sep. p90 time from allocation to completion is 7.8 days, so the last
+      cohorts simply have not finished yet. Acceptance is unaffected because accepts land within a day.</p>
+    <div class="legend">
+      <span><i class="swatch" style="background:var(--s1)"></i>accepted</span>
+      <span><i class="swatch" style="background:var(--s2)"></i>completed PSO</span>
+    </div>
+    <div id="cohortChart"></div>
+  </div>
+</div>
+
+<footer>Built from <code>pso_funnel_events.csv</code>. Rebuild with <code>python build_dashboard.py</code>.</footer>
+</div>
+<div id="tooltip" role="status" aria-live="polite"></div>
+
+<script id="pso-data" type="application/json">__PSO_DATA__</script>
+<script>
+"use strict";
+
+/* ---------- decode payload ---------- */
+const RAW = JSON.parse(document.getElementById("pso-data").textContent);
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function col(name) {
+  const c = RAW.columns[name];
+  const bytes = b64ToBytes(c.data);
+  if (c.type === "u8") return bytes;
+  if (c.type === "u16") return new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2);
+  if (c.type === "u32") return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
+  throw new Error("unknown column type " + c.type);
+}
+
+const N = RAW.n;
+const STEPS = RAW.steps;                 // ordered funnel step names
+const STEP_BIT = {};
+STEPS.forEach((s, i) => (STEP_BIT[s] = i));
+const LIKENESS_STEPS = RAW.likeness_steps;
+LIKENESS_STEPS.forEach((s, i) => (STEP_BIT[s] = STEPS.length + i));
+const MATURE_BIT = STEPS.length + LIKENESS_STEPS.length;
+
+const LU = RAW.lookups;                  // category index -> label
+const C = {
+  mask: col("mask"),
+  project: col("project"),
+  device: col("device"),
+  country: col("country"),
+  tenure: col("tenure"),
+  est: col("est"),
+  concurrent: col("concurrent"),
+  week: col("week"),
+  variant: col("variant"),
+  session: col("session"),
+  questions: col("questions"),
+  starts: col("starts"),
+};
+
+const has = (i, step) => (C.mask[i] & (1 << STEP_BIT[step])) !== 0;
+const isMature = (i) => (C.mask[i] & (1 << MATURE_BIT)) !== 0;
+
+/* ---------- stats ---------- */
+function wilson(k, n, z = 1.96) {
+  if (!n) return { p: NaN, lo: NaN, hi: NaN };
+  const p = k / n, d = 1 + (z * z) / n;
+  const c = (p + (z * z) / (2 * n)) / d;
+  const h = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
+  return { p, lo: Math.max(0, c - h), hi: Math.min(1, c + h) };
+}
+function erfc(x) { // Abramowitz & Stegun 7.1.26, enough for a z-test p-value
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+  return x >= 0 ? 1 - y : 1 + y;
+}
+function twoProp(x1, n1, x2, n2) {
+  if (!n1 || !n2) return { p1: NaN, p2: NaN, diff: NaN, z: NaN, pv: NaN };
+  const p1 = x1 / n1, p2 = x2 / n2, pool = (x1 + x2) / (n1 + n2);
+  const se = Math.sqrt(pool * (1 - pool) * (1 / n1 + 1 / n2));
+  const z = se > 0 ? (p1 - p2) / se : NaN;
+  return { p1, p2, diff: p1 - p2, z, pv: se > 0 ? erfc(Math.abs(z) / Math.SQRT2) : NaN };
+}
+const fmtN = (v) => v.toLocaleString("en-US");
+const fmtPct = (v, d = 1) => (isNaN(v) ? "–" : (v * 100).toFixed(d) + "%");
+const prettyStep = (s) => s.replace(/_/g, " ");
+
+/* ---------- filter state ---------- */
+const DIMS = [
+  { key: "project", label: "Project" },
+  { key: "device", label: "Device" },
+  { key: "country", label: "Country" },
+  { key: "tenure", label: "Tenure" },
+  { key: "est", label: "Assessment length" },
+  { key: "concurrent", label: "Concurrent PSOs" },
+  { key: "week", label: "Allocation week" },
+  { key: "variant", label: "Likeness arm" },
+];
+const state = {};
+DIMS.forEach((d) => (state[d.key] = -1));
+state.matureOnly = false;
+
+function currentRows(opts = {}) {
+  const skip = opts.skip || [];
+  const out = [];
+  for (let i = 0; i < N; i++) {
+    let ok = true;
+    for (const d of DIMS) {
+      if (skip.includes(d.key)) continue;
+      const want = state[d.key];
+      if (want !== -1 && C[d.key][i] !== want) { ok = false; break; }
+    }
+    if (ok && state.matureOnly && !isMature(i)) ok = false;
+    if (ok) out.push(i);
+  }
+  return out;
+}
+
+/* device index for "unknown" is appended last by the build script */
+const DEVICE_UNKNOWN = LU.device.indexOf("unknown");
+
+/* ---------- svg helpers ---------- */
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, parent = null) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function svgRoot(host, w, h) {
+  host.innerHTML = "";
+  const s = el("svg", { viewBox: `0 0 ${w} ${h}`, role: "img" });
+  host.appendChild(s);
+  return s;
+}
+const tooltip = document.getElementById("tooltip");
+function bindTip(node, html) {
+  node.addEventListener("pointerenter", (e) => {
+    tooltip.innerHTML = html;
+    tooltip.style.opacity = "1";
+    moveTip(e);
+  });
+  node.addEventListener("pointermove", moveTip);
+  node.addEventListener("pointerleave", () => (tooltip.style.opacity = "0"));
+}
+function moveTip(e) {
+  const pad = 14, r = tooltip.getBoundingClientRect();
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + r.width > window.innerWidth - 8) x = e.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = e.clientY - r.height - pad;
+  tooltip.style.left = x + "px";
+  tooltip.style.top = y + "px";
+}
+
+/* rounded only on the data end, anchored to the baseline */
+function barPath(x, y, w, h, r, horizontal) {
+  r = Math.max(0, Math.min(r, horizontal ? w : h));
+  if (horizontal) {
+    return `M${x},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} H${x} Z`;
+  }
+  return `M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + h} Z`;
+}
+
+/* ---------- funnel ---------- */
+function computeFunnel(rows) {
+  return STEPS.map((s) => {
+    let k = 0;
+    for (const i of rows) if (has(i, s)) k++;
+    return { step: s, reached: k };
+  });
+}
+
+function renderFunnel(rows) {
+  const f = computeFunnel(rows);
+  const total = f[0].reached;
+  const host = document.getElementById("funnelChart");
+  if (!total) { host.innerHTML = '<p class="empty">No instances match these filters.</p>';
+    document.getElementById("funnelTable").innerHTML = "";
+    document.getElementById("funnelNote").textContent = ""; return; }
+
+  // worst step conversion, ignoring the first step and the unreliable email steps
+  let worst = null;
+  f.forEach((d, i) => {
+    if (i === 0) return;
+    const prev = f[i - 1].reached;
+    d.conv = prev ? d.reached / prev : NaN;
+    d.lost = prev - d.reached;
+    if (!RAW.email_tracking_steps.includes(d.step) && prev > 200 && (!worst || d.conv < worst.conv)) worst = d;
+  });
+
+  const rowH = 27, padT = 6, padB = 24, left = 196, right = 92;
+  const w = 1000, h = padT + f.length * rowH + padB;
+  const svg = svgRoot(host, w, h);
+  const plotW = w - left - right;
+  const x = (v) => (v / total) * plotW;
+
+  [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
+    el("line", { class: "gridline", x1: left + t * plotW, x2: left + t * plotW, y1: padT, y2: padT + f.length * rowH }, svg);
+    const tx = el("text", { class: "tick", x: left + t * plotW, y: h - 8, "text-anchor": "middle" }, svg);
+    tx.textContent = Math.round(t * 100) + "%";
+  });
+
+  f.forEach((d, i) => {
+    const y = padT + i * rowH + 3;
+    const bh = rowH - 9;
+    const isWorst = worst && d.step === worst.step;
+    const lbl = el("text", { x: left - 10, y: y + bh / 2 + 4, "text-anchor": "end" }, svg);
+    lbl.textContent = prettyStep(d.step);
+    if (isWorst) lbl.setAttribute("class", "worstlabel");
+
+    // lost-at-step ghost, drawn from this bar's end to the previous bar's end
+    if (i > 0 && d.lost > 0) {
+      el("path", {
+        d: barPath(left + x(d.reached) + 2, y, Math.max(0, x(f[i - 1].reached) - x(d.reached) - 2), bh, 4, true),
+        fill: "var(--grid)",
+      }, svg);
+    }
+    const bar = el("path", {
+      d: barPath(left, y, Math.max(2, x(d.reached)), bh, 4, true),
+      fill: isWorst ? "var(--critical)" : "var(--s1)",
+    }, svg);
+    bindTip(bar, `<b>${prettyStep(d.step)}</b><br>${fmtN(d.reached)} instances &middot; ${fmtPct(d.reached / total)} of allocated` +
+      (i > 0 ? `<br>step conversion <b>${fmtPct(d.conv)}</b><br>lost here: ${fmtN(d.lost)}` : ""));
+
+    const v = el("text", { class: "vlabel", x: left + Math.max(2, x(d.reached)) + 8, y: y + bh / 2 + 4 }, svg);
+    v.textContent = `${fmtN(d.reached)}  (${fmtPct(d.reached / total, 1)})`;
+  });
+
+  // table
+  const inverted = f.some((d, i) => i > 0 && d.conv > 1);
+  const t = document.getElementById("funnelTable");
+  t.innerHTML = "<thead><tr><th>Step</th><th>Reached</th><th>Step conv.</th><th>Lost here</th><th>% of allocated</th></tr></thead><tbody>" +
+    f.map((d, i) => {
+      const warn = RAW.email_tracking_steps.includes(d.step)
+        ? ' <span class="dim" title="open/click pixels undercount">(tracked)</span>' : "";
+      // A conversion over 100% means more people reached this step than the one
+      // before it, which only happens where the previous step is undercounted.
+      const over = i > 0 && d.conv > 1;
+      return `<tr class="${worst && d.step === worst.step ? "worst" : ""}">
+        <td>${prettyStep(d.step)}${warn}</td>
+        <td>${fmtN(d.reached)}</td>
+        <td>${i ? fmtPct(d.conv) + (over ? " †" : "") : "–"}</td>
+        <td>${i ? (over ? '<span class="dim">—</span>' : fmtN(d.lost)) : "–"}</td>
+        <td>${fmtPct(d.reached / total)}</td></tr>`;
+    }).join("") + "</tbody>";
+
+  const note = document.getElementById("funnelNote");
+  let html = "";
+  if (worst) {
+    html += `<b>Worst conversion in view: ${prettyStep(worst.step)} at ${fmtPct(worst.conv)}</b>, losing
+      ${fmtN(worst.lost)} instances. Email open and click steps are excluded from this comparison because their
+      drops are partly measurement — see the Data quality tab.`;
+  }
+  if (inverted) {
+    html += `<br><br>† <b>A step above 100% is the email tracking gap, not an error.</b> More instances reached
+      that step than the one before it because open and click tracking undercounts — 1,272 instances clicked
+      with no recorded open, and 1,701 accepted in-app with no recorded click. It shows up here because this
+      filter selects a group where those instances are a larger share. Only <em>email clicked</em> and
+      <em>PSO accepted</em> can ever do this: every other step is always preceded by the step before it, so no
+      filter can push it above 100%.`;
+  }
+  note.innerHTML = html;
+}
+
+/* ---------- KPIs ---------- */
+function renderKpis(rows) {
+  const n = rows.length;
+  const count = (s) => rows.reduce((a, i) => a + (has(i, s) ? 1 : 0), 0);
+  const accepted = count("pso_accepted"), completed = count("pso_completed");
+  const started = count("assessment_started"), attempted = count("assessment_attempted");
+  const submitted = count("first_task_submitted");
+  const tiles = [
+    { k: "PSO instances", v: fmtN(n), d: n === N ? "all data, no filters" : `${fmtPct(n / N, 1)} of all instances` },
+    { k: "Accepted invitation", v: fmtPct(n ? accepted / n : NaN), d: `${fmtN(accepted)} instances` },
+    { k: "Assessment attempt rate", v: fmtPct(started ? attempted / started : NaN), d: `${fmtN(attempted)} of ${fmtN(started)} who started` },
+    { k: "Completed PSO", v: fmtPct(n ? completed / n : NaN), d: `${fmtN(completed)} instances` },
+    { k: "Submitted a first task", v: fmtPct(n ? submitted / n : NaN), d: `${fmtN(submitted)} instances` },
+  ];
+  document.getElementById("kpis").innerHTML = tiles.map(
+    (t) => `<div class="kpi"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="d">${t.d}</div></div>`
+  ).join("");
+}
+
+/* ---------- generic grouped bar with CI ---------- */
+function renderRateBars(host, series, opts = {}) {
+  const w = opts.width || 480, barH = 30, padT = 8, padB = 26, left = opts.left || 92, right = 58;
+  const h = padT + series.length * barH + padB;
+  const svg = svgRoot(host, w, h);
+  const plotW = w - left - right;
+  const maxV = Math.max(0.0001, ...series.map((s) => s.hi || s.p));
+  // Round the axis up to a fifth so the four gridlines land on round percentages.
+  const scaleMax = Math.min(1, Math.ceil((maxV * 1.08) / 0.2) * 0.2);
+  const x = (v) => (v / scaleMax) * plotW;
+
+  for (let t = 0; t <= scaleMax + 1e-9; t += scaleMax / 4) {
+    el("line", { class: "gridline", x1: left + x(t), x2: left + x(t), y1: padT, y2: padT + series.length * barH }, svg);
+    const tx = el("text", { class: "tick", x: left + x(t), y: h - 9, "text-anchor": "middle" }, svg);
+    tx.textContent = Math.round(t * 100) + "%";
+  }
+
+  series.forEach((s, i) => {
+    const y = padT + i * barH + 4, bh = barH - 11;
+    const lab = el("text", { x: left - 9, y: y + bh / 2 + 4, "text-anchor": "end" }, svg);
+    lab.textContent = s.label;
+    const bar = el("path", { d: barPath(left, y, Math.max(2, x(s.p)), bh, 4, true), fill: s.color || "var(--s1)" }, svg);
+    bindTip(bar, `<b>${s.label}</b><br>${fmtPct(s.p)} &nbsp;(${fmtN(s.k)} of ${fmtN(s.n)})<br>95% CI ${fmtPct(s.lo)} – ${fmtPct(s.hi)}`);
+    if (s.n > 0 && isFinite(s.lo)) {
+      const y0 = y + bh / 2;
+      el("line", { x1: left + x(s.lo), x2: left + x(s.hi), y1: y0, y2: y0, stroke: "var(--ink)", "stroke-width": 1.5, opacity: 0.55 }, svg);
+      [s.lo, s.hi].forEach((v) =>
+        el("line", { x1: left + x(v), x2: left + x(v), y1: y0 - 4, y2: y0 + 4, stroke: "var(--ink)", "stroke-width": 1.5, opacity: 0.55 }, svg));
+    }
+    const v = el("text", { class: "vlabel", x: left + x(Math.max(s.p, s.hi || 0)) + 8, y: y + bh / 2 + 4 }, svg);
+    v.textContent = fmtPct(s.p);
+  });
+}
+
+/* ---------- assessment tab ---------- */
+function renderAssessment(rows) {
+  const starters = rows.filter((i) => has(i, "assessment_started"));
+  const abandoners = starters.filter((i) => !has(i, "assessment_attempted"));
+
+  const zeroQ = abandoners.filter((i) => C.questions[i] === 0).length;
+  const med = (arr) => {
+    if (!arr.length) return NaN;
+    const a = arr.slice().sort((x, y) => x - y);
+    const m = a.length >> 1;
+    return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+  };
+  const medSec = med(abandoners.map((i) => C.session[i]));
+
+  document.getElementById("assessKpis").innerHTML = [
+    { k: "Opened the assessment", v: fmtN(starters.length), d: "instances in view" },
+    { k: "Never answered a question", v: fmtN(zeroQ), d: starters.length ? `${fmtPct(zeroQ / starters.length)} of starters` : "–" },
+    { k: "Median time before leaving", v: isNaN(medSec) ? "–" : Math.round(medSec) + "s", d: "abandoners only" },
+    { k: "Attempt rate", v: fmtPct(starters.length ? (starters.length - abandoners.length) / starters.length : NaN), d: `${fmtN(starters.length - abandoners.length)} attempted` },
+  ].map((t) => `<div class="kpi"><div class="k">${t.k}</div><div class="v">${t.v}</div><div class="d">${t.d}</div></div>`).join("");
+
+  document.getElementById("bounceNote").innerHTML = abandoners.length
+    ? `<b>${fmtN(zeroQ)} of ${fmtN(abandoners.length)} abandoners (${fmtPct(zeroQ / abandoners.length)}) answered zero questions</b>,
+       after a median of ${Math.round(medSec)} seconds on the page. Nobody is grinding through and giving up —
+       they look at the assessment and leave. That is a landing-screen problem, not a difficulty problem.`
+    : "No abandoners in view.";
+
+  // median bail time by assessment length
+  {
+    const host = document.getElementById("bailChart");
+    const byLen = LU.est.map((lbl, idx) => {
+      const vals = abandoners.filter((i) => C.est[i] === idx).map((i) => C.session[i]);
+      return { label: lbl, v: med(vals), n: vals.length };
+    }).filter((d) => d.n >= 10);
+    if (!byLen.length) { host.innerHTML = '<p class="empty">Not enough abandoners in view.</p>'; }
+    else {
+      const w = 480, h = 230, left = 46, right = 14, padT = 12, padB = 40;
+      const svg = svgRoot(host, w, h);
+      const plotW = w - left - right, plotH = h - padT - padB;
+      const yMax = 200;
+      const X = (i) => left + (byLen.length === 1 ? plotW / 2 : (i / (byLen.length - 1)) * plotW);
+      const Y = (v) => padT + plotH - (Math.min(v, yMax) / yMax) * plotH;
+      [0, 50, 100, 150, 200].forEach((t) => {
+        el("line", { class: "gridline", x1: left, x2: left + plotW, y1: Y(t), y2: Y(t) }, svg);
+        const tx = el("text", { class: "tick", x: left - 8, y: Y(t) + 4, "text-anchor": "end" }, svg);
+        tx.textContent = t + "s";
+      });
+      el("path", { d: byLen.map((d, i) => `${i ? "L" : "M"}${X(i)},${Y(d.v)}`).join(" "), fill: "none", stroke: "var(--s2)", "stroke-width": 2 }, svg);
+      byLen.forEach((d, i) => {
+        const c = el("circle", { cx: X(i), cy: Y(d.v), r: 5, fill: "var(--s2)", stroke: "var(--surface)", "stroke-width": 2 }, svg);
+        bindTip(c, `<b>${d.label}</b><br>median ${Math.round(d.v)}s before abandoning<br>${fmtN(d.n)} abandoners`);
+        const tx = el("text", { class: "tick", x: X(i), y: h - 20, "text-anchor": "middle" }, svg);
+        tx.textContent = d.label.replace(" min", "");
+      });
+      const ax = el("text", { class: "tick", x: left + plotW / 2, y: h - 4, "text-anchor": "middle" }, svg);
+      ax.textContent = "advertised assessment length (minutes)";
+    }
+  }
+
+  // attempt rate by est minutes
+  {
+    const series = LU.est.map((lbl, idx) => {
+      const grp = starters.filter((i) => C.est[i] === idx);
+      const k = grp.filter((i) => has(i, "assessment_attempted")).length;
+      const ci = wilson(k, grp.length);
+      return { label: lbl, k, n: grp.length, ...ci, color: idx >= RAW.long_est_index ? "var(--s2)" : "var(--s1)" };
+    }).filter((s) => s.n > 0);
+    const host = document.getElementById("lengthChart");
+    if (!series.length) host.innerHTML = '<p class="empty">No starters in view.</p>';
+    else renderRateBars(host, series, { left: 72 });
+  }
+
+  // attempt rate by device
+  {
+    const series = LU.device.map((lbl, idx) => {
+      const grp = starters.filter((i) => C.device[i] === idx);
+      const k = grp.filter((i) => has(i, "assessment_attempted")).length;
+      return { label: lbl, k, n: grp.length, ...wilson(k, grp.length), color: ["var(--s1)", "var(--s2)", "var(--s3)", "var(--muted)"][idx] };
+    }).filter((s) => s.n > 0);
+    const host = document.getElementById("deviceChart");
+    if (!series.length) host.innerHTML = '<p class="empty">No starters in view.</p>';
+    else renderRateBars(host, series, { left: 78 });
+  }
+
+  // device x length matrix
+  {
+    const host = document.getElementById("matrixChart");
+    const devices = LU.device.filter((d) => d !== "unknown");
+    const buckets = [
+      { label: "under 40 min", test: (i) => C.est[i] < RAW.long_est_index },
+      { label: "40+ min", test: (i) => C.est[i] >= RAW.long_est_index },
+    ];
+    const cells = [];
+    devices.forEach((dev, r) => buckets.forEach((b, c) => {
+      const di = LU.device.indexOf(dev);
+      const grp = starters.filter((i) => C.device[i] === di && b.test(i));
+      const k = grp.filter((i) => has(i, "assessment_attempted")).length;
+      cells.push({ r, c, dev, bucket: b.label, k, n: grp.length, p: grp.length ? k / grp.length : NaN });
+    }));
+    if (!cells.some((x) => x.n > 0)) { host.innerHTML = '<p class="empty">No starters in view.</p>'; return; }
+    const cw = 150, ch = 62, left = 78, top = 24;
+    const w = left + buckets.length * cw + 8, h = top + devices.length * ch + 30;
+    const svg = svgRoot(host, w, h);
+    const ramp = ["--seq1", "--seq2", "--seq3", "--seq4", "--seq5", "--seq6", "--seq7"];
+    buckets.forEach((b, c) => {
+      const t = el("text", { class: "tick", x: left + c * cw + cw / 2, y: top - 8, "text-anchor": "middle" }, svg);
+      t.textContent = b.label;
+    });
+    devices.forEach((d, r) => {
+      const t = el("text", { x: left - 9, y: top + r * ch + ch / 2 + 4, "text-anchor": "end" }, svg);
+      t.textContent = d;
+    });
+    cells.forEach((cell) => {
+      const x = left + cell.c * cw, y = top + cell.r * ch;
+      const idx = isNaN(cell.p) ? 0 : Math.min(ramp.length - 1, Math.floor(cell.p * ramp.length));
+      const deep = idx >= 4; // the four lightest ramp steps take dark ink, the rest light
+      const rect = el("rect", { x: x + 1, y: y + 1, width: cw - 3, height: ch - 3, rx: 6,
+        fill: cell.n ? `var(${ramp[idx]})` : "var(--grid)" }, svg);
+      bindTip(rect, `<b>${cell.dev} &middot; ${cell.bucket}</b><br>attempt rate ${fmtPct(cell.p)}<br>${fmtN(cell.k)} of ${fmtN(cell.n)} starters`);
+      const v = el("text", { class: deep ? "cell-hi" : "cell-lo", x: x + cw / 2, y: y + ch / 2,
+        "text-anchor": "middle", "font-size": "16", "font-weight": "600" }, svg);
+      v.textContent = isNaN(cell.p) ? "–" : fmtPct(cell.p, 1);
+      const sub = el("text", { class: deep ? "cell-hi-sub" : "cell-lo-sub", x: x + cw / 2,
+        y: y + ch / 2 + 17, "text-anchor": "middle", "font-size": "10.5" }, svg);
+      sub.textContent = `n = ${fmtN(cell.n)}`;
+    });
+  }
+
+  document.getElementById("assessNote").innerHTML =
+    `Country, tenure and prior projects are flat across this step. Concurrent PSOs has no consistent
+     trend: there is a dip at 3 concurrent PSOs, and the groups at 4–5 are too small to read. Device and
+     assessment length are the two dimensions that move it consistently. Use the
+     <b>Compare any segment</b> tab to check any of these yourself.`;
+}
+
+/* ---------- compare tab ---------- */
+function renderCompare(rows) {
+  const from = document.getElementById("cmpFrom").value;
+  const to = document.getElementById("cmpTo").value;
+  const dimKey = document.getElementById("cmpDim").value;
+  const labels = LU[dimKey];
+  const base = rows.filter((i) => has(i, from));
+
+  const series = labels.map((lbl, idx) => {
+    const grp = base.filter((i) => C[dimKey][i] === idx);
+    const k = grp.filter((i) => has(i, to)).length;
+    return { label: String(lbl), k, n: grp.length, ...wilson(k, grp.length) };
+  }).filter((s) => s.n > 0);
+
+  const host = document.getElementById("compareChart");
+  const table = document.getElementById("compareTable");
+  if (!series.length) {
+    host.innerHTML = `<p class="empty">No instances reach <em>${prettyStep(from)}</em> under these filters.</p>`;
+    table.innerHTML = ""; return;
+  }
+  series.sort((a, b) => b.p - a.p);
+  const spread = series[0].p - series[series.length - 1].p;
+  series.forEach((s) => (s.color = "var(--s1)"));
+  renderRateBars(host, series, { width: 980, left: 150 });
+
+  const totK = series.reduce((a, s) => a + s.k, 0), totN = series.reduce((a, s) => a + s.n, 0);
+  table.innerHTML = `<thead><tr><th>${DIMS.find((d) => d.key === dimKey).label}</th>
+      <th>Reached ${prettyStep(from)}</th><th>Reached ${prettyStep(to)}</th><th>Rate</th><th>95% CI</th></tr></thead><tbody>` +
+    series.map((s) => `<tr><td>${s.label}</td><td>${fmtN(s.n)}</td><td>${fmtN(s.k)}</td>
+      <td>${fmtPct(s.p)}</td><td class="dim">${fmtPct(s.lo)} – ${fmtPct(s.hi)}</td></tr>`).join("") +
+    `<tr><td><b>All</b></td><td><b>${fmtN(totN)}</b></td><td><b>${fmtN(totK)}</b></td>
+      <td><b>${fmtPct(totN ? totK / totN : NaN)}</b></td><td class="dim">spread ${(spread * 100).toFixed(1)}pp</td></tr></tbody>`;
+}
+
+/* ---------- likeness tab ---------- */
+function renderLikeness() {
+  // the pilot arms are only comparable against each other, so ignore project/variant filters
+  const rows = currentRows({ skip: ["project", "variant"] }).filter((i) => C.variant[i] !== LU.variant.indexOf("none"));
+  const earlyIdx = LU.variant.indexOf("early"), lateIdx = LU.variant.indexOf("late");
+  const early = rows.filter((i) => C.variant[i] === earlyIdx);
+  const late = rows.filter((i) => C.variant[i] === lateIdx);
+
+  const host = document.getElementById("abChart");
+  const table = document.getElementById("abTable");
+  if (!early.length || !late.length) {
+    host.innerHTML = '<p class="empty">No pilot instances match these filters.</p>';
+    table.innerHTML = ""; document.getElementById("abVerdict").textContent = "";
+    document.getElementById("abCaveat").textContent = ""; return;
+  }
+
+  const stats = STEPS.map((s) => {
+    const xe = early.filter((i) => has(i, s)).length, xl = late.filter((i) => has(i, s)).length;
+    return { step: s, xe, xl, ...twoProp(xe, early.length, xl, late.length) };
+  });
+
+  // padB has to clear the longest rotated tick ("confidentiality agreement
+  // signed" is ~170px, which is ~140px tall once rotated 55 degrees).
+  const w = 1000, h = 390, left = 48, right = 16, padT = 14, padB = 170;
+  const svg = svgRoot(host, w, h);
+  const plotW = w - left - right, plotH = h - padT - padB;
+  const X = (i) => left + (i / (STEPS.length - 1)) * plotW;
+  const Y = (v) => padT + plotH - v * plotH;
+  [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
+    el("line", { class: "gridline", x1: left, x2: left + plotW, y1: Y(t), y2: Y(t) }, svg);
+    const tx = el("text", { class: "tick", x: left - 8, y: Y(t) + 4, "text-anchor": "end" }, svg);
+    tx.textContent = Math.round(t * 100) + "%";
+  });
+  [["p1", "var(--s1)", "early"], ["p2", "var(--s2)", "late"]].forEach(([key, color, name]) => {
+    el("path", { d: stats.map((d, i) => `${i ? "L" : "M"}${X(i)},${Y(d[key])}`).join(" "),
+      fill: "none", stroke: color, "stroke-width": 2 }, svg);
+    stats.forEach((d, i) => {
+      const c = el("circle", { cx: X(i), cy: Y(d[key]), r: 4.5, fill: color, stroke: "var(--surface)", "stroke-width": 2 }, svg);
+      bindTip(c, `<b>${prettyStep(d.step)}</b> &middot; ${name}<br>${fmtPct(d[key], 2)} of allocated
+        (${fmtN(key === "p1" ? d.xe : d.xl)})<br>other arm ${fmtPct(key === "p1" ? d.p2 : d.p1, 2)}
+        ${isFinite(d.z) ? "&middot; z = " + d.z.toFixed(2) : ""}`);
+    });
+  });
+  STEPS.forEach((s, i) => {
+    const t = el("text", { class: "tick", x: X(i), y: h - padB + 16, "text-anchor": "end",
+      transform: `rotate(-55 ${X(i)} ${h - padB + 16})` }, svg);
+    t.textContent = prettyStep(s);
+  });
+
+  const key = (s) => stats.find((d) => d.step === s);
+  const liked = LIKENESS_STEPS.map((s) => {
+    const xe = early.filter((i) => has(i, s)).length, xl = late.filter((i) => has(i, s)).length;
+    return { step: s, xe, xl };
+  });
+
+  table.innerHTML = `<thead><tr><th>Step</th><th>Early n</th><th>Early %</th><th>Late n</th><th>Late %</th>
+      <th>Diff (pp)</th><th>z</th><th>p</th></tr></thead><tbody>` +
+    stats.map((d) => {
+      // Both arms are 100% at allocation by construction, so there is no test to run.
+      if (!isFinite(d.z)) {
+        return `<tr><td>${prettyStep(d.step)}</td><td>${fmtN(d.xe)}</td><td>${fmtPct(d.p1, 2)}</td>
+          <td>${fmtN(d.xl)}</td><td>${fmtPct(d.p2, 2)}</td>
+          <td colspan="3" class="dim">both arms by construction</td></tr>`;
+      }
+      const sig = Math.abs(d.z) >= 1.96;
+      return `<tr><td>${prettyStep(d.step)}</td><td>${fmtN(d.xe)}</td><td>${fmtPct(d.p1, 2)}</td>
+        <td>${fmtN(d.xl)}</td><td>${fmtPct(d.p2, 2)}</td>
+        <td>${(d.diff * 100).toFixed(2)}</td><td>${d.z.toFixed(2)}</td>
+        <td class="dim">${d.pv < 0.001 ? "&lt;0.001" : d.pv.toFixed(3)}${sig ? "" : " (n.s.)"}</td></tr>`;
+    }).join("") +
+    liked.map((d) => `<tr><td>${prettyStep(d.step)}</td><td>${fmtN(d.xe)}</td>
+      <td>${fmtPct(d.xe / early.length, 2)}</td><td>${fmtN(d.xl)}</td>
+      <td>${fmtPct(d.xl / late.length, 2)}</td><td colspan="3" class="dim">gate reached at different points by design</td></tr>`).join("") +
+    "</tbody>";
+
+  // wasted qualification effort
+  const declIdx = "likeness_agreement_declined";
+  const wasted = (arr) => arr.filter((i) => has(i, declIdx) && has(i, "assessment_passed")).length;
+  const decl = (arr) => arr.filter((i) => has(i, declIdx)).length;
+  const fts = key("first_task_submitted"), psoc = key("pso_completed");
+  const mde = (() => {
+    const p = (psoc.xe + psoc.xl) / (early.length + late.length);
+    return (1.96 + 0.84) * Math.sqrt(p * (1 - p) * (1 / early.length + 1 / late.length));
+  })();
+
+  document.getElementById("abVerdict").innerHTML =
+    `<b>Recommendation: ask early, right after the invitation is accepted.</b><br>
+     Delivered capacity is the same either way — ${fmtN(fts.xe)} vs ${fmtN(fts.xl)} taskers submitted a first task
+     (${fmtPct(fts.p1, 2)} vs ${fmtPct(fts.p2, 2)}, z = ${fts.z.toFixed(2)}, not significant). But
+     <b>${fmtN(wasted(late))} of the ${fmtN(decl(late))} late-arm decliners had already passed the assessment</b>,
+     against ${fmtN(wasted(early))} of ${fmtN(decl(early))} in the early arm. Asking early turns an expensive
+     late loss into a cheap early one at no cost to output.`;
+
+  document.getElementById("abCaveat").innerHTML =
+    `<b>What this does not prove.</b> With ${fmtN(early.length)} and ${fmtN(late.length)} per arm at a
+     ${fmtPct((psoc.xe + psoc.xl) / (early.length + late.length), 1)} completion rate, the pilot could only detect a
+     difference of about <b>${(mde * 100).toFixed(2)}pp</b> (80% power). "No difference" here means "none big enough
+     to matter", not zero. And the gate-level decline rates are <b>not</b> comparable between arms — the late arm only
+     ever asks people who already survived the assessment, so it measures a pre-selected group.`;
+}
+
+/* ---------- data quality tab ---------- */
+function renderQuality() {
+  document.getElementById("qualityBody").innerHTML = RAW.quality_notes
+    .map((q) => `<div class="callout ${q.level}"><b>${q.title}</b><br>${q.body}</div>`).join("");
+
+  const host = document.getElementById("cohortChart");
+  const weeks = LU.week;
+  const data = weeks.map((lbl, idx) => {
+    const grp = [];
+    for (let i = 0; i < N; i++) if (C.week[i] === idx) grp.push(i);
+    const acc = grp.filter((i) => has(i, "pso_accepted")).length;
+    const comp = grp.filter((i) => has(i, "pso_completed")).length;
+    return { label: lbl, n: grp.length, acc: grp.length ? acc / grp.length : 0, comp: grp.length ? comp / grp.length : 0 };
+  });
+  const w = 1000, h = 260, left = 44, right = 14, padT = 12, padB = 74;
+  const svg = svgRoot(host, w, h);
+  const plotW = w - left - right, plotH = h - padT - padB;
+  const X = (i) => left + (i / (data.length - 1)) * plotW;
+  const Y = (v) => padT + plotH - (v / 0.5) * plotH;
+  [0, 0.1, 0.2, 0.3, 0.4, 0.5].forEach((t) => {
+    el("line", { class: "gridline", x1: left, x2: left + plotW, y1: Y(t), y2: Y(t) }, svg);
+    const tx = el("text", { class: "tick", x: left - 8, y: Y(t) + 4, "text-anchor": "end" }, svg);
+    tx.textContent = Math.round(t * 100) + "%";
+  });
+  [["acc", "var(--s1)", "accepted"], ["comp", "var(--s2)", "completed PSO"]].forEach(([k, color, name]) => {
+    el("path", { d: data.map((d, i) => `${i ? "L" : "M"}${X(i)},${Y(d[k])}`).join(" "),
+      fill: "none", stroke: color, "stroke-width": 2 }, svg);
+    data.forEach((d, i) => {
+      const c = el("circle", { cx: X(i), cy: Y(d[k]), r: 4, fill: color, stroke: "var(--surface)", "stroke-width": 2 }, svg);
+      bindTip(c, `<b>week of ${d.label}</b><br>${name}: ${fmtPct(d[k])}<br>${fmtN(d.n)} instances allocated`);
+    });
+  });
+  data.forEach((d, i) => {
+    const t = el("text", { class: "tick", x: X(i), y: h - padB + 14, "text-anchor": "end",
+      transform: `rotate(-55 ${X(i)} ${h - padB + 14})` }, svg);
+    t.textContent = d.label;
+  });
+}
+
+/* ---------- UI wiring ---------- */
+function buildFilters() {
+  const host = document.getElementById("filters");
+  host.innerHTML = DIMS.map((d) =>
+    `<div class="field"><label for="f-${d.key}">${d.label}</label>
+      <select id="f-${d.key}" data-dim="${d.key}"><option value="-1">All</option>` +
+    LU[d.key].map((lbl, i) => `<option value="${i}">${lbl}</option>`).join("") +
+    `</select></div>`
+  ).join("") +
+    `<label class="check"><input type="checkbox" id="f-mature">
+       Mature cohorts only (allocated 7+ days before extract)</label>
+     <button type="button" id="resetBtn">Reset</button>`;
+
+  host.querySelectorAll("select[data-dim]").forEach((sel) =>
+    sel.addEventListener("change", () => { state[sel.dataset.dim] = Number(sel.value); renderAll(); }));
+  document.getElementById("f-mature").addEventListener("change", (e) => {
+    state.matureOnly = e.target.checked; renderAll();
+  });
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    DIMS.forEach((d) => { state[d.key] = -1; document.getElementById("f-" + d.key).value = "-1"; });
+    state.matureOnly = false; document.getElementById("f-mature").checked = false;
+    renderAll();
+  });
+}
+
+function buildCompareControls() {
+  const from = document.getElementById("cmpFrom"), to = document.getElementById("cmpTo"), dim = document.getElementById("cmpDim");
+  from.innerHTML = STEPS.slice(0, -1).map((s) => `<option value="${s}">${prettyStep(s)}</option>`).join("");
+  to.innerHTML = STEPS.slice(1).map((s) => `<option value="${s}">${prettyStep(s)}</option>`).join("");
+  dim.innerHTML = DIMS.map((d) => `<option value="${d.key}">${d.label}</option>`).join("");
+  from.value = "assessment_started"; to.value = "assessment_attempted"; dim.value = "device";
+  [from, to, dim].forEach((s) => s.addEventListener("change", () => {
+    // keep "to" strictly after "from"
+    if (STEP_BIT[to.value] <= STEP_BIT[from.value]) {
+      const next = STEPS[STEP_BIT[from.value] + 1];
+      if (next) to.value = next;
+    }
+    renderCompare(currentRows());
+  }));
+}
+
+const TABS = [
+  { id: "funnel", label: "Funnel" },
+  { id: "assessment", label: "Assessment drop-off" },
+  { id: "compare", label: "Compare any segment" },
+  { id: "likeness", label: "Likeness pilot" },
+  { id: "quality", label: "Data quality" },
+];
+let activeTab = TABS.some((t) => "#" + t.id === location.hash) ? location.hash.slice(1) : "funnel";
+function showTab(id, pushHash = true) {
+  activeTab = id;
+  document.querySelectorAll(".tab").forEach((x) =>
+    x.setAttribute("aria-selected", String(x.dataset.tab === activeTab)));
+  TABS.forEach((t) => (document.getElementById("tab-" + t.id).hidden = t.id !== activeTab));
+  if (pushHash && location.hash !== "#" + id) history.replaceState(null, "", "#" + id);
+  renderAll();
+}
+function buildTabs() {
+  const host = document.getElementById("tabs");
+  host.innerHTML = TABS.map((t) =>
+    `<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${t.id === activeTab}">${t.label}</button>`).join("");
+  host.querySelectorAll(".tab").forEach((b) =>
+    b.addEventListener("click", () => showTab(b.dataset.tab)));
+  window.addEventListener("hashchange", () => {
+    const id = location.hash.slice(1);
+    if (TABS.some((t) => t.id === id) && id !== activeTab) showTab(id, false);
+  });
+  TABS.forEach((t) => (document.getElementById("tab-" + t.id).hidden = t.id !== activeTab));
+}
+
+function renderAll() {
+  const rows = currentRows();
+
+  // Device is only recorded on assessment_started, so filtering by it also
+  // filters to instances that reached the assessment. Everything earlier in the
+  // funnel then reads 100% and the rates are not comparable to the unfiltered
+  // view. Worth saying out loud rather than letting someone misread it.
+  const dw = document.getElementById("deviceWarning");
+  if (state.device !== -1) {
+    dw.hidden = false;
+    dw.innerHTML = `<b>Heads up: device is only observed at the assessment.</b> Filtering by it also
+      restricts the view to the ${fmtN(rows.length)} instances that opened an assessment, so every step up to
+      <em>assessment started</em> will read 100% and later percentages are shares of that group — not of all
+      allocations. Use it to compare devices against each other, not against the unfiltered funnel.`;
+  } else {
+    dw.hidden = true;
+  }
+
+  renderKpis(rows);
+  if (activeTab === "funnel") renderFunnel(rows);
+  if (activeTab === "assessment") renderAssessment(rows);
+  if (activeTab === "compare") renderCompare(rows);
+  if (activeTab === "likeness") renderLikeness();
+  if (activeTab === "quality") renderQuality();
+}
+
+function initTheme() {
+  const btn = document.getElementById("themeBtn");
+  const sync = () => {
+    const dark = document.documentElement.getAttribute("data-theme") === "dark" ||
+      (!document.documentElement.getAttribute("data-theme") &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches);
+    btn.textContent = dark ? "Light mode" : "Dark mode";
+  };
+  btn.addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur === "dark" || (!cur && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+    sync(); renderAll();
+  });
+  sync();
+}
+
+document.getElementById("headline").innerHTML = RAW.headline;
+buildFilters();
+buildCompareControls();
+buildTabs();
+initTheme();
+renderAll();
+</script>
+</body>
+</html>
