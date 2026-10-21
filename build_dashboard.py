@@ -135,8 +135,11 @@ QUALITY_NOTES = [
         "level": "warn",
         "title": "Email opens and clicks are undercounted",
         "body": "2,311 instances accepted the invitation with no recorded <code>email_opened</code>, and "
-                "1,701 with no recorded <code>email_clicked</code> — the latter accepted in-app, never "
-                "touching the email. Open tracking relies on a pixel that many mail clients block. The "
+                "1,701 with no recorded <code>email_clicked</code>. The 1,701 are exactly the instances "
+                "that accepted in-app: all had the email delivered and 503 opened it, but none used its "
+                "link. The open undercount shows among those who accepted through the email: every one "
+                "clicked its link, yet 1,113 have no recorded open. Open tracking relies on a pixel that "
+                "many mail clients block. The "
                 "<code>email_delivered → email_opened</code> step shows the largest raw drop in the funnel "
                 "(21,139), but it is part measurement artifact and nothing in this data separates the two. "
                 "It is excluded from the \"worst step\" comparison for that reason.",

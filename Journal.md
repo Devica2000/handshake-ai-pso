@@ -76,14 +76,19 @@ end up as 5,503 completed PSOs (10.2%) and 3,093 first tasks submitted (5.7%).
 **My first candidate was the largest raw drop, and I decided not to trust it.** Email delivered →
 opened loses 21,139 instances, by far the biggest number. Before treating it as the problem I
 wanted to know whether that step is even measured reliably, so I counted people who accepted the
-invitation without a recorded open. There are 2,311 of them, and 1,701 accepted in-app without
-touching the email at all (2,470 instances reach some later step with no recorded open). Open
-tracking relies on a pixel that many mail clients block, so this step is part real loss and part
-missed tracking, and nothing in the data separates the two. I set it aside rather than build a
+invitation without a recorded open: 2,311. That number mixes two groups, so I split it by how they
+accepted. 1,701 accepted in-app; all of them had the email delivered and 503 opened it, but none
+clicked it. The rest accepted through the email: every one of them clicked its link, yet 1,113 have
+no recorded open. A click with no open means the open happened and was not recorded. Open tracking
+relies on a pixel that many mail clients block, so this step is part real loss and part missed
+tracking, and nothing in the data separates the two. I set it aside rather than build a
 recommendation on it.
 
-**So I ranked the steps by conversion rate on events I could trust.** The worst is assessment
-started → attempted: 57.7% conversion, 7,067 instances lost. Looking at the assessment as a
+**So I ranked the steps by conversion rate on events I could trust.** I gave "trust" a concrete
+test: outside the two email-tracked steps, no instance ever reaches a step without the one before
+it, while 1,272 instances clicked with no recorded open and 1,701 accepted with no recorded click.
+The worst of the trustworthy steps is assessment started → attempted: 57.7% conversion, 7,067
+instances lost. Looking at the assessment as a
 whole, 16,720 people open it and 6,300 pass, so 62% of everyone who gets that far never makes it
 through. Nothing else in the funnel comes close. This is the drop I focused on.
 
@@ -275,8 +280,10 @@ funnel results should only be read for cohorts at least 7 days old.
 ## Appendix B — Assumptions I made
 
 1. **The unit is the PSO instance**, (tasker_id, project_id), not the tasker.
-2. **A step counts as reached if its event ever appears** for that instance, so the funnel only
-   ever goes down. This is why the 2,470 instances with a missing `email_opened` do not break it.
+2. **A step counts as reached if its event ever appears** for that instance. Outside the two
+   email-tracked steps, no instance ever reaches a step without the one before it. The 2,470
+   instances that reach a later step with no recorded `email_opened` are tracking gaps, and they
+   are why a dashboard filter can occasionally show a step above 100% of the one before.
 3. **The 3,121 repeated `event_id` rows are pipeline replays**, not real events, and are dropped.
 4. **Device is taken from the earliest `assessment_started` that recorded one**, after collapsing
    the 10 raw values to desktop / mobile / tablet.

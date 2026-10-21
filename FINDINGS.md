@@ -55,13 +55,16 @@ mobile are as capable as the ones we keep. We are losing them to an interface, n
 | first_task_submitted | 3,093 | 86.5% | 481 | 5.7% |
 
 **The largest raw drop is not the real problem.** `email_delivered → email_opened` loses 21,139,
-but 2,311 instances accepted the invitation with no recorded open and 1,701 accepted in-app having
-never touched the email. Open tracking relies on a pixel that many mail clients block. That step is part
+but open tracking demonstrably undercounts: every instance that accepted through the email clicked
+its link, yet 1,113 of them have no recorded open. (Another 1,701 accepted in-app without using the
+email's link; all of them had it delivered and 503 opened it.) Open tracking relies on a pixel that
+many mail clients block. That step is part
 measurement artifact and nothing in this data separates the two halves, so I would not spend a
 quarter on it without better instrumentation first.
 
 **The real problem is the assessment block.** `assessment_started → assessment_attempted` converts
-at 57.7%, the worst step in the funnel, measured from server-side events we can trust. Taken as a
+at 57.7%, the worst step in the funnel, and its events are internally consistent: outside the two
+email-tracked steps, no instance ever reaches a step without the one before it. Taken as a
 whole, **16,720 people open an assessment and 6,300 pass: 62% of everyone who gets that far never
 makes it through.** Nothing else in the funnel is close.
 
@@ -226,9 +229,11 @@ true non-consent rate is the early arm's 12.3%, and we should plan capacity on t
 1. The unit of analysis is a **PSO instance**, `(tasker_id, project_id)` — 53,935 of them across
    30,025 taskers. Taskers run up to six PSOs at once at different stages, so tasker-level rates
    would be wrong.
-2. A step counts as reached if the event **ever** appears for that instance, so the funnel is
-   monotonic by construction. 2,470 instances reach a step after `email_opened` without a recorded
-   open (2,311 of them accepted); those are tracking gaps, not time travel.
+2. A step counts as reached if the event **ever** appears for that instance. Every step outside
+   email is strictly nested — no instance reaches it without the step before — but the two
+   email-tracked steps are not: 2,470 instances reach a step after `email_opened` without a recorded
+   open (2,311 of them accepted). Those are tracking gaps, and they are why a dashboard filter can
+   occasionally show `email_clicked` or `pso_accepted` above 100% of the step before.
 3. **3,121 rows were dropped** as exact duplicates — byte-identical on all 14 columns including
    `event_id`. Treated as a pipeline replay. This is why raw event counts run higher than the
    funnel (54,473 raw `pso_allocated` rows vs 53,935 allocated instances; the 538 difference is all
